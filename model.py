@@ -312,14 +312,14 @@ def match_size(x, size):
 # Generator
 
 class Generator(nn.Module):
-    def __init__(self, in_channels=1, out_channels=1, img_size=(256, 256)):
+    def __init__(self, img_size=(256, 256)):
         super().__init__()
         nf = 16
 
-        self.pooling = nn.MaxPool3d(kernel_size=2)
+        self.pooling = nn.MaxPool2d(kernel_size=2)
 
-        self.conv1 = CNNencoder(in_channels, nf)
-        self.conv2 = CNNencoder(nf, nf*2)
+        self.conv1 = CNNencoder(1, 16)
+        self.conv2 = CNNencoder(16, 32)
         self.conv3 = CNNencoder(nf*2, nf*4)
         self.conv4 = CNNencoder(nf*4, nf*8)
         self.conv5 = CNNencoder(nf*8, nf*8)
@@ -332,7 +332,7 @@ class Generator(nn.Module):
         self.up4 = CNNdecoder(nf*2*2, nf)
 
         self.out = nn.Sequential(
-            nn.Conv3d(nf*2, out_channels, kernel_size=1, stride=1, bias=False),
+            nn.Conv2d(nf*2, 1, kernel_size=1, stride=1, bias=False),
             nn.LeakyReLU(inplace=True)
         )
 
@@ -369,7 +369,7 @@ class Generator(nn.Module):
 
 # model1 = Generator(in_channels=1, out_channels=1, img_size=(160, 192, 224)).cuda()
 
-model1 = Generator(in_channels=1, out_channels=1, img_size=(256, 256)).cuda()
+model1 = Generator(img_size=(256, 256)).cuda()
 
 # print(list(model1.parameters()))
 
