@@ -365,18 +365,35 @@ class Generator(nn.Module):
         # (B, 128, 16, 16)
         c5 = self.conv5(p4)
         # (B, 128, 16, 16)
-        v1 = self.vit(c5)
-
-        u1 = self.up1(v1, c4)
-        u2 = self.up2(u1, c3)
-        u3 = self.up3(u2, c2)
-        u4 = self.up4(u3, c1)
-        out = self.out(u4)
+        v = self.vit(c5)
+        # (B, 128, 8, 8)
+        v1 = self.upsample(v)
+        # (B, 128, 16, 16)
+        u1 = self.up1(v1, c5)
+        # (B, 128, 16, 16)
+        u1 = self.upsample(u1)
+        # (B, 128, 32, 32)
+        u2 = self.up2(u1, c4)
+        # (B, 64, 32, 32)
+        u2 = self.upsample(u2)
+        # (B, 64, 64, 64)
+        u3 = self.up3(u2, c3)
+        # (B, 32, 64, 64)
+        u3 = self.upsample(u3)
+        # (B, 32, 128, 128)
+        u4 = self.up4(u3, c2)
+        # (B, 16, 128, 128)
+        u4 = self.upsample(u4)
+        # (B, 16, 256, 256)
+        u5 = self.up5(u4, c1)
+        # (B, num_class, 256, 256)
+        out = self.out(u5)
+        # (B, num_class, 256, 256)
 
         # if x.size() != out.size():
         #     out = match_size(out, x.shape[2:])
 
-        return u1, u2, u3, u4, out
+        return out
 
 
 
