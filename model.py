@@ -69,32 +69,34 @@ class Embeddings(nn.Module):
         down_factor = 4
         # input image가 얼마나 많이 pooling을 거치냐가 down_factor
         # Maxpool2d가 4번 있으니 down_factor = 4
-        # patch_size = _triple(8, 8, 8)
-        patch_size = (8, 8)
+        patch_size = (2, 2)
+        # patch_size가 무조건 2여야 할듯?
+        # ViT를 거친 후에 1번 upsample을 해서 skip_connection을 해야하는데
+        # patch_size가 2가 아니면(2보다 크면) 1번 upsample로 size 맞춤이 불가능
         n_patches = int((img_size[0]/2**down_factor// patch_size[0]) * (img_size[1]/2**down_factor// patch_size[1]))
         # n_pathces = (256/2**4//8) * (256/2**4//8) = 4
         self.patch_embeddings = Conv2d(in_channels=128,
                                        # 우선 in channels는 128로 설정하자
-                                       out_channels=252,
-                                       # out_channels = hidden size D = 252
+                                       out_channels=768,
+                                       # out_channels = hidden size D = 768
                                        kernel_size=patch_size,
                                        stride=patch_size)
-        self.position_embeddings = nn.Parameter(torch.zeros(1, n_patches, 252))
+        self.position_embeddings = nn.Parameter(torch.zeros(1, n_patches, 768))
 
         self.dropout = Dropout(0.1)
 
     def forward(self, x):
         # input = (B, 128, 16, 16)
         x = self.patch_embeddings(x)  # (B, hidden, n_patches^(1/2), n_patches^(1/2))
-        # (B, 252, 2, 2)
+        # (B, 768, 8, 8)
         x = x.flatten(2)
-        # (B, 252, 4)
+        # (B, 768, 64)
         x = x.transpose(-1, -2)  # (B, n_patches, hidden)
-        # (B, 4, 252)
+        # (B, 64, 768)
         position_embeddings = self.position_embeddings
-        # position_embeddings = (B, 4, 252)
+        # position_embeddings = (B, 64, 768)
         embeddings = x + position_embeddings
-        # 보니깐 position_embeddings가 64인거같애
+        # (B, 64, 768)
         embeddings = self.dropout(embeddings)
         return embeddings
 
@@ -106,16 +108,16 @@ class MSA(nn.Module):
         super(MSA, self).__init__()
         self.num_attention_heads = 12
         # Number of head = 12
-        self.attention_head_size = int(252 / self.num_attention_heads)
-        # Attention Head size = Hidden size(D)(252) / Number of head(12) = 21
+        self.attention_head_size = int(768 / self.num_attention_heads)
+        # Attention Head size = Hidden size(D)(768) / Number of head(12) = 64
         self.all_head_size = self.num_attention_heads * self.attention_head_size
-        # All Head size = (12 * 21) = 252 = Hidden size
-        self.query = Linear(252, self.all_head_size)
-        self.key = Linear(252, self.all_head_size)
-        self.value = Linear(252, self.all_head_size)
-        self.out = Linear(252, 252)
-        self.attn_dropout = Dropout(0.0)
-        self.proj_dropout = Dropout(0.0)
+        # All Head size = (12 * 64) = 768 = Hidden size
+        self.query = Linear(768, self.all_head_size)
+        self.key = Linear(768, self.all_head_size)
+        self.value = Linear(768, self.all_head_size)
+        self.out = Linear(768, 768)
+        self.attn_dropout = Dropout(0.1)
+        self.proj_dropout = Dropout(0.1)
         self.softmax = Softmax(dim=-1)
 
     # def transpose_for_scores(self, x):
@@ -156,8 +158,8 @@ class MSA(nn.Module):
 class MLP(nn.Module):
     def __init__(self):
         super(MLP, self).__init__()
-        self.fc1 = Linear(252, 3072)
-        self.fc2 = Linear(3072, 252)
+        self.fc1 = Linear(768, 3072)
+        self.fc2 = Linear(3072, 768)
         self.act_fn = torch.nn.functional.gelu
         self.dropout = Dropout(0.1)
         self._init_weights()
@@ -182,9 +184,9 @@ class MLP(nn.Module):
 class Block(nn.Module):
     def __init__(self):
         super(Block, self).__init__()
-        self.hidden_size = 252
-        self.attention_norm = LayerNorm(252, eps=1e-6)
-        self.ffn_norm = LayerNorm(252, eps=1e-6)
+        self.hidden_size = 768
+        self.attention_norm = LayerNorm(768, eps=1e-6)
+        self.ffn_norm = LayerNorm(768, eps=1e-6)
         self.ffn = MLP()
         self.attn = MSA()
 
@@ -208,7 +210,7 @@ class ViTencoder(nn.Module):
     def __init__(self):
         super(ViTencoder, self).__init__()
         self.layer = nn.ModuleList()
-        self.encoder_norm = LayerNorm(252, eps=1e-6)
+        self.encoder_norm = LayerNorm(768, eps=1e-6)
         for _ in range(12):
             layer = Block()
             self.layer.append(copy.deepcopy(layer))
@@ -258,38 +260,31 @@ class ViT(nn.Module):
         self.embeddings = Embeddings(img_size=img_size)
         self.encoder = ViTencoder()
         self.img_size = img_size
-        self.patch_size = (8, 8)
+        self.patch_size = (2, 2)
         self.down_factor = 4
-        self.conv_more = Conv2dReLU(252, 128, kernel_size=3, padding=1, use_batchnorm=True)
+        self.conv_more = Conv2dReLU(768, 128, kernel_size=3, padding=1, use_batchnorm=True)
 
     def forward(self, x):
-        # embedding_output, features = self.embeddings(input_ids)
-        # encoded, attn_weights = self.encoder(embedding_output)  # (B, n_patch, hidden)
-        # return encoded, attn_weights, features
 
         x = self.embeddings(x)
-        # (B, 4, 252)
+        # (B, 64, 768)
         x = self.encoder(x)  # (B, n_patch, hidden)
-        # (B, 4, 252)
+        # (B, 64, 768)
         B, n_patch, hidden = x.size()
-        # B=B, n_patch=4, hidden=252
+        # B=B, n_patch=64, hidden=768
         h, w = (self.img_size[0] // 2**self.down_factor // self.patch_size[0]), (self.img_size[1] // 2**self.down_factor // self.patch_size[0])
-        # h=2, w=2
+        # h=8, w=8
         x = x.permute(0, 2, 1)
-        # (B, 252, 4)
+        # (B, 768, 64)
         x = x.contiguous().view(B, hidden, h, w)
-        # (B, 252, 2, 2)
+        # (B, 768, 8, 8)
         x = self.conv_more(x)
-        # (B, 128, 2, 2)
+        # (B, 128, 8, 8)
         return x
 
-    # 여기서 x = ViT의 결과값 feature(x)이
-    # features = skip connection에 사용될 feature인듯고
-    # 그러면 난 features는 필요없을듯! CNN encoder에서 갖고오니깐
+# 이거 upsample 한번 하자
 
-# 그리고 이 ViT의 output은 3개 dimension ex) [2, 64, 252]가 나오는데 = [B, n_patch, hidden]
-# 이거를 CNN decoder에 넣으려면 5-dimension으로 변환시켜야해
-# Class ViT 안에 3 -> 5 dimension 변환 과정을 추가하자!
+
 
 
 
