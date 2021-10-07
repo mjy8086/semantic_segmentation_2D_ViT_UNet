@@ -50,8 +50,8 @@ class CNNdecoder(nn.Module):
 
     def forward(self, x, skip_x):
         x = self.model(x)
-        if x.size() != skip_x.size():
-            x = match_size(x, skip_x.shape[2:])
+        # if x.size() != skip_x.size():
+        #     x = match_size(x, skip_x.shape[2:])
         x = torch.cat((x, skip_x), 1)
         return x
 
@@ -66,11 +66,13 @@ class Embeddings(nn.Module):
     """
     def __init__(self, img_size):
         super(Embeddings, self).__init__()
-        down_factor = 2
+        down_factor = 4
+        # input image가 얼마나 많이 pooling을 거치냐가 down_factor
+        # Maxpool2d가 4번 있으니 down_factor = 4
         # patch_size = _triple(8, 8, 8)
         patch_size = (8, 8)
         n_patches = int((img_size[0]/2**down_factor// patch_size[0]) * (img_size[1]/2**down_factor// patch_size[1]))
-        self.hybrid_model = CNNencoder(in_c=128, out_c=128)
+        # n_pathces = (256/2**4//8) * (256/2**4//8) = 4
         self.patch_embeddings = Conv2d(in_channels=128,
                                        # 우선 in channels는 128로 설정하자
                                        out_channels=252,
@@ -82,15 +84,17 @@ class Embeddings(nn.Module):
         self.dropout = Dropout(0.1)
 
     def forward(self, x):
-        x = self.hybrid_model(x)
-        # (B, 128, 16, 16)
+        # input = (B, 128, 16, 16)
         x = self.patch_embeddings(x)  # (B, hidden, n_patches^(1/2), n_patches^(1/2))
         # (B, 252, 2, 2)
         x = x.flatten(2)
         # (B, 252, 4)
         x = x.transpose(-1, -2)  # (B, n_patches, hidden)
         # (B, 4, 252)
-        embeddings = x + self.position_embeddings
+        position_embeddings = self.position_embeddings
+        # position_embeddings = (B, 4, 252)
+        embeddings = x + position_embeddings
+        # 보니깐 position_embeddings가 64인거같애
         embeddings = self.dropout(embeddings)
         return embeddings
 
@@ -255,22 +259,28 @@ class ViT(nn.Module):
         self.encoder = ViTencoder()
         self.img_size = img_size
         self.patch_size = (8, 8)
-        self.down_factor = 2
+        self.down_factor = 4
         self.conv_more = Conv2dReLU(252, 128, kernel_size=3, padding=1, use_batchnorm=True)
 
-    def forward(self, input_ids):
+    def forward(self, x):
         # embedding_output, features = self.embeddings(input_ids)
         # encoded, attn_weights = self.encoder(embedding_output)  # (B, n_patch, hidden)
         # return encoded, attn_weights, features
 
-        embedding_output = self.embeddings(input_ids)
-        encoded = self.encoder(embedding_output)  # (B, n_patch, hidden)
-
-        B, n_patch, hidden = encoded.size()
+        x = self.embeddings(x)
+        # (B, 4, 252)
+        x = self.encoder(x)  # (B, n_patch, hidden)
+        # (B, 4, 252)
+        B, n_patch, hidden = x.size()
+        # B=B, n_patch=4, hidden=252
         h, w = (self.img_size[0] // 2**self.down_factor // self.patch_size[0]), (self.img_size[1] // 2**self.down_factor // self.patch_size[0])
-        x = encoded.permute(0, 2, 1)
+        # h=2, w=2
+        x = x.permute(0, 2, 1)
+        # (B, 252, 4)
         x = x.contiguous().view(B, hidden, h, w)
+        # (B, 252, 2, 2)
         x = self.conv_more(x)
+        # (B, 128, 2, 2)
         return x
 
     # 여기서 x = ViT의 결과값 feature(x)이
@@ -285,32 +295,32 @@ class ViT(nn.Module):
 
 # Matching size
 
-def match_size(x, size):
-    _, _, h1, w1, d1 = x.shape
-    h2, w2, d2 = size
-
-    while d1 != d2:
-        if d1 < d2:
-            x = nn.functional.pad(x, (0, 1), mode='constant', value=0)
-            d1 += 1
-        else:
-            x = x[:, :, :, :, :d2]
-            break
-    while w1 != w2:
-        if w1 < w2:
-            x = nn.functional.pad(x, (0, 0, 0, 1), mode='constant', value=0)
-            w1 += 1
-        else:
-            x = x[:, :, :, :w2, :]
-            break
-    while h1 != h2:
-        if h1 < h2:
-            x = nn.functional.pad(x, (0, 0, 0, 0, 0, 1), mode='constant', value=0)
-            h1 += 1
-        else:
-            x = x[:, :, :h2, :, :]
-            break
-    return x
+# def match_size(x, size):
+#     _, _, h1, w1, d1 = x.shape
+#     h2, w2, d2 = size
+#
+#     while d1 != d2:
+#         if d1 < d2:
+#             x = nn.functional.pad(x, (0, 1), mode='constant', value=0)
+#             d1 += 1
+#         else:
+#             x = x[:, :, :, :, :d2]
+#             break
+#     while w1 != w2:
+#         if w1 < w2:
+#             x = nn.functional.pad(x, (0, 0, 0, 1), mode='constant', value=0)
+#             w1 += 1
+#         else:
+#             x = x[:, :, :, :w2, :]
+#             break
+#     while h1 != h2:
+#         if h1 < h2:
+#             x = nn.functional.pad(x, (0, 0, 0, 0, 0, 1), mode='constant', value=0)
+#             h1 += 1
+#         else:
+#             x = x[:, :, :h2, :, :]
+#             break
+#     return x
 
 
 # Generator
@@ -343,19 +353,23 @@ class Generator(nn.Module):
 
     def forward(self, x):
         c1 = self.conv1(x)
+        # (B, 16, 256, 256)
         p1 = self.pooling(c1)
-
+        # (B, 16, 128, 128)
         c2 = self.conv2(p1)
+        # (B, 32, 128, 128)
         p2 = self.pooling(c2)
-
+        # (B, 32, 64, 64)
         c3 = self.conv3(p2)
+        # (B, 64, 64, 64)
         p3 = self.pooling(c3)
-
+        # (B, 64, 32, 32)
         c4 = self.conv4(p3)
+        # (B, 128, 32, 32)
         p4 = self.pooling(c4)
-
+        # (B, 128, 16, 16)
         c5 = self.conv5(p4)
-
+        # (B, 128, 16, 16)
         v1 = self.vit(c5)
 
         u1 = self.up1(v1, c4)
@@ -364,8 +378,8 @@ class Generator(nn.Module):
         u4 = self.up4(u3, c1)
         out = self.out(u4)
 
-        if x.size() != out.size():
-            out = match_size(out, x.shape[2:])
+        # if x.size() != out.size():
+        #     out = match_size(out, x.shape[2:])
 
         return u1, u2, u3, u4, out
 
