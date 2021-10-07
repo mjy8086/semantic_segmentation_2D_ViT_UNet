@@ -83,9 +83,13 @@ class Embeddings(nn.Module):
 
     def forward(self, x):
         x = self.hybrid_model(x)
+        # (B, 128, 16, 16)
         x = self.patch_embeddings(x)  # (B, hidden, n_patches^(1/2), n_patches^(1/2))
+        # (B, 252, 2, 2)
         x = x.flatten(2)
+        # (B, 252, 4)
         x = x.transpose(-1, -2)  # (B, n_patches, hidden)
+        # (B, 4, 252)
         embeddings = x + self.position_embeddings
         embeddings = self.dropout(embeddings)
         return embeddings
