@@ -1,20 +1,13 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 import torch
-import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms as T
-import torchvision
-import torch.nn.functional as F
-from torch.autograd import Variable
 from PIL import Image
 import cv2
 import albumentations as A
-import time
 import os
-from tqdm.notebook import tqdm
 
 
 IMAGE_PATH = '/DataCommon2/mjy/data/Deeplearning_Project/Drone_dataset/dataset/semantic_drone_dataset/original_images/'
@@ -119,7 +112,7 @@ train_set = DroneDataset(IMAGE_PATH, MASK_PATH, X_train, mean, std, t_train, pat
 val_set = DroneDataset(IMAGE_PATH, MASK_PATH, X_val, mean, std, t_val, patch=False)
 
 #dataloader
-batch_size= 3
+batch_size= 10
 
-train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True)
+train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, drop_last=True)
+val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True, drop_last=True)
