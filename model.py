@@ -3,7 +3,7 @@ from torch import nn
 from torch.nn.modules.module import Module
 from torch.nn.modules.utils import _triple
 import torch.nn.functional
-from torch.nn import Dropout, Softmax, Linear, Conv3d, LayerNorm, Conv2d
+from torch.nn import Dropout, Softmax, Linear, LayerNorm, Conv2d
 import torchvision
 import math
 import copy
@@ -69,11 +69,11 @@ class Embeddings(nn.Module):
         # input image가 얼마나 많이 pooling을 거치냐가 down_factor
         # Maxpool2d가 4번 있으니 down_factor = 4
         patch_size = (2, 2)
-        # patch_size가 무조건 2여야 할듯?
+        # patch_size는 2로 설정
         # ViT를 거친 후에 1번 upsample을 해서 skip_connection을 해야하는데
         # patch_size가 2가 아니면(2보다 크면) 1번 upsample로 size 맞춤이 불가능
         n_patches = int((img_size[0]/2**down_factor// patch_size[0]) * (img_size[1]/2**down_factor// patch_size[1]))
-        # n_pathces = (768/2**4//8) * (512/2**4//8) = 4
+        # n_pathces = (512/2**4//8) * (768/2**4//8) = 4
         self.patch_embeddings = Conv2d(in_channels=256,
                                        # 우선 in channels는 128로 설정하자
                                        out_channels=768,
@@ -264,7 +264,7 @@ class ViT(nn.Module):
         self.conv_more = Conv2dReLU(768, 256, kernel_size=3, padding=1, use_batchnorm=True)
 
     def forward(self, x):
-        # (B, 256, 48, 32)
+        # (B, 256, 32, 48)
         x = self.embeddings(x)
         # (B, 384, 768)
         x = self.encoder(x)  # (B, n_patch, hidden)
@@ -276,23 +276,23 @@ class ViT(nn.Module):
         x = x.permute(0, 2, 1)
         # (B, 768, 384)
         x = x.contiguous().view(B, hidden, h, w)
-        # (B, 768, 24, 16)
+        # (B, 768, 16, 24)
         x = self.conv_more(x)
-        # (B, 256, 24, 16)
+        # (B, 256, 16, 24)
         return x
 
 
 
 # Generator
 
-class Generator(nn.Module):
-    def __init__(self, img_size=(768, 512)):
+class ViT_UNet(nn.Module):
+    def __init__(self, img_size=(512, 768)):
         super().__init__()
 
         self.pooling = nn.MaxPool2d(kernel_size=2)
         self.upsample = nn.Upsample(scale_factor=2)
 
-        self.conv1_1 = CNNencoder(1, 16)
+        self.conv1_1 = CNNencoder(3, 16)
         self.conv1_2 = CNNencoder(16, 16)
         self.conv2_1 = CNNencoder(16, 32)
         self.conv2_2 = CNNencoder(32, 32)
@@ -316,83 +316,69 @@ class Generator(nn.Module):
         self.concat5 = Concat(32, 23)
         self.convup5 = CNNencoder(23, 23)
 
-        self.Segmentation_head = nn.Sequential(
-            nn.Conv2d(23, 23, kernel_size=1, stride=1, bias=False),
-            nn.BatchNorm2d(),
-            nn.LeakyReLU(inplace=True)
-        )
+        self.Segmentation_head = nn.Conv2d(23, 23, kernel_size=1, stride=1, bias=False)
 
 
     def forward(self, x):
-        # (B, in_channel, 768, 512)
+        # (B, in_channel, 512, 768)
         c1 = self.conv1_1(x)
         c1 = self.conv1_2(c1)
-        # (B, 16, 768, 512)
+        # (B, 16, 512, 768)
         p1 = self.pooling(c1)
-        # (B, 16, 384, 256)
+        # (B, 16, 256, 384)
         c2 = self.conv2_1(p1)
         c2 = self.conv2_2(c2)
-        # (B, 32, 384, 256)
+        # (B, 16, 256, 384)
         p2 = self.pooling(c2)
-        # (B, 32, 192, 128)
+        # (B, 32, 128, 192)
         c3 = self.conv3_1(p2)
         c3 = self.conv3_2(c3)
-        # (B, 64, 192, 128)
+        # (B, 32, 128, 192)
         p3 = self.pooling(c3)
-        # (B, 64, 96, 64)
+        # (B, 64, 64, 96)
         c4 = self.conv4_1(p3)
         c4 = self.conv4_2(c4)
-        # (B, 128, 96, 64)
+        # (B, 128, 64, 96)
         p4 = self.pooling(c4)
-        # (B, 128, 48, 32)
+        # (B, 128, 32, 48)
         c5 = self.conv5_1(p4)
         c5 = self.conv5_2(c5)
-        # (B, 256, 48, 32)
+        # (B, 256, 32, 48)
         v = self.vit(c5)
-        # (B, 256, 24, 16)
+        # (B, 256, 16, 24)
         v1 = self.upsample(v)
-        # (B, 256, 48, 32)
+        # (B, 256, 32, 48)
         u1 = self.concat1(v1, c5)
         u1 = self.convup1(u1)
-        # (B, 128, 48, 32)
+        # (B, 128, 32, 48)
         u1 = self.upsample(u1)
-        # (B, 128, 96, 64)
+        # (B, 128, 64, 96)
         u2 = self.concat2(u1, c4)
         u2 = self.convup2(u2)
-        # (B, 64, 96, 64)
+        # (B, 64, 64, 96)
         u2 = self.upsample(u2)
-        # (B, 64, 192, 128)
+        # (B, 64, 128, 192)
         u3 = self.concat3(u2, c3)
         u3 = self.convup3(u3)
-        # (B, 32, 192, 128)
+        # (B, 32, 128, 192)
         u3 = self.upsample(u3)
-        # (B, 32, 384, 256)
+        # (B, 32, 256, 384)
         u4 = self.concat4(u3, c2)
         u4 = self.convup4(u4)
-        # (B, 16, 384, 256)
+        # (B, 16, 256, 384)
         u4 = self.upsample(u4)
-        # (B, 16, 768, 512)
+        # (B, 16, 512, 768)
         u5 = self.concat5(u4, c1)
         u5 = self.convup5(u5)
-        # (B, 23, 768, 512)
+        # (B, 23, 512, 768)
         out = self.Segmentation_head(u5)
-        # (B, 23, 768, 512)
-
-        # if x.size() != out.size():
-        #     out = match_size(out, x.shape[2:])
+        # (B, 23, 512, 768)
 
         return out
 
 
 
-# model1 = Generator(in_channels=1, out_channels=1, img_size=(160, 192, 224)).cuda()
-
-model1 = Generator(img_size=(768, 512)).cuda()
-
-# print(list(model1.parameters()))
-
-# print(list(model1.named_parameters()))
-
-# summary(model1, (1, 160, 192, 224))
-
-summary(model1, (1, 768, 512))
+# model1 = ViT_UNet(img_size=(512, 768)).cuda()
+#
+#
+# summary(model1, (1, 512, 768))
