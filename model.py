@@ -28,8 +28,8 @@ class CNNencoder(nn.Module):
         super().__init__()
         self.model = nn.Sequential(
             nn.Conv2d(in_c, out_c, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.LeakyReLU(inplace=True),
-            nn.InstanceNorm2d(out_c)
+            nn.BatchNorm2d(out_c),
+            nn.LeakyReLU(inplace=True)
         )
 
     def forward(self, x):
@@ -37,23 +37,22 @@ class CNNencoder(nn.Module):
         return out
 
 
-# CNN Decoder
+# CNN Concat
 
-class CNNdecoder(nn.Module):
+class Concat(nn.Module):
     def __init__(self, in_c, out_c):
         super().__init__()
         self.model = nn.Sequential(
-            nn.ConvTranspose2d(in_c, out_c, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.LeakyReLU(inplace=True),
-            nn.InstanceNorm2d(out_c)
+            nn.Conv2d(in_c, out_c, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(out_c),
+            nn.LeakyReLU(inplace=True)
         )
 
-    def forward(self, x, skip_x):
-        x = self.model(x)
-        # if x.size() != skip_x.size():
-        #     x = match_size(x, skip_x.shape[2:])
-        x = torch.cat((x, skip_x), 1)
-        return x
+    def forward(self, x, skip):
+
+        x = torch.cat((x, skip), 1)
+        out = self.model(x)
+        return out
 
 
 
@@ -74,8 +73,8 @@ class Embeddings(nn.Module):
         # ViT를 거친 후에 1번 upsample을 해서 skip_connection을 해야하는데
         # patch_size가 2가 아니면(2보다 크면) 1번 upsample로 size 맞춤이 불가능
         n_patches = int((img_size[0]/2**down_factor// patch_size[0]) * (img_size[1]/2**down_factor// patch_size[1]))
-        # n_pathces = (256/2**4//8) * (256/2**4//8) = 4
-        self.patch_embeddings = Conv2d(in_channels=128,
+        # n_pathces = (768/2**4//8) * (512/2**4//8) = 4
+        self.patch_embeddings = Conv2d(in_channels=256,
                                        # 우선 in channels는 128로 설정하자
                                        out_channels=768,
                                        # out_channels = hidden size D = 768
@@ -86,17 +85,17 @@ class Embeddings(nn.Module):
         self.dropout = Dropout(0.1)
 
     def forward(self, x):
-        # input = (B, 128, 16, 16)
+        # input = (B, 256, 48, 32)
         x = self.patch_embeddings(x)  # (B, hidden, n_patches^(1/2), n_patches^(1/2))
-        # (B, 768, 8, 8)
+        # (B, 768, 24, 16)
         x = x.flatten(2)
-        # (B, 768, 64)
+        # (B, 768, 384)
         x = x.transpose(-1, -2)  # (B, n_patches, hidden)
-        # (B, 64, 768)
+        # (B, 384, 768)
         position_embeddings = self.position_embeddings
-        # position_embeddings = (B, 64, 768)
+        # position_embeddings = (B, 384, 768)
         embeddings = x + position_embeddings
-        # (B, 64, 768)
+        # (B, 384, 768)
         embeddings = self.dropout(embeddings)
         return embeddings
 
@@ -262,133 +261,122 @@ class ViT(nn.Module):
         self.img_size = img_size
         self.patch_size = (2, 2)
         self.down_factor = 4
-        self.conv_more = Conv2dReLU(768, 128, kernel_size=3, padding=1, use_batchnorm=True)
+        self.conv_more = Conv2dReLU(768, 256, kernel_size=3, padding=1, use_batchnorm=True)
 
     def forward(self, x):
-
+        # (B, 256, 48, 32)
         x = self.embeddings(x)
-        # (B, 64, 768)
+        # (B, 384, 768)
         x = self.encoder(x)  # (B, n_patch, hidden)
-        # (B, 64, 768)
+        # (B, 384, 768)
         B, n_patch, hidden = x.size()
-        # B=B, n_patch=64, hidden=768
+        # B=B, n_patch=384, hidden=768
         h, w = (self.img_size[0] // 2**self.down_factor // self.patch_size[0]), (self.img_size[1] // 2**self.down_factor // self.patch_size[0])
-        # h=8, w=8
+        # h=24, w=16
         x = x.permute(0, 2, 1)
-        # (B, 768, 64)
+        # (B, 768, 384)
         x = x.contiguous().view(B, hidden, h, w)
-        # (B, 768, 8, 8)
+        # (B, 768, 24, 16)
         x = self.conv_more(x)
-        # (B, 128, 8, 8)
+        # (B, 256, 24, 16)
         return x
 
-# 이거 upsample 한번 하자
-
-
-
-
-
-# Matching size
-
-# def match_size(x, size):
-#     _, _, h1, w1, d1 = x.shape
-#     h2, w2, d2 = size
-#
-#     while d1 != d2:
-#         if d1 < d2:
-#             x = nn.functional.pad(x, (0, 1), mode='constant', value=0)
-#             d1 += 1
-#         else:
-#             x = x[:, :, :, :, :d2]
-#             break
-#     while w1 != w2:
-#         if w1 < w2:
-#             x = nn.functional.pad(x, (0, 0, 0, 1), mode='constant', value=0)
-#             w1 += 1
-#         else:
-#             x = x[:, :, :, :w2, :]
-#             break
-#     while h1 != h2:
-#         if h1 < h2:
-#             x = nn.functional.pad(x, (0, 0, 0, 0, 0, 1), mode='constant', value=0)
-#             h1 += 1
-#         else:
-#             x = x[:, :, :h2, :, :]
-#             break
-#     return x
 
 
 # Generator
 
 class Generator(nn.Module):
-    def __init__(self, img_size=(256, 256)):
+    def __init__(self, img_size=(768, 512)):
         super().__init__()
-        nf = 16
 
         self.pooling = nn.MaxPool2d(kernel_size=2)
+        self.upsample = nn.Upsample(scale_factor=2)
 
-        self.conv1 = CNNencoder(1, 16)
-        self.conv2 = CNNencoder(16, 32)
-        self.conv3 = CNNencoder(nf*2, nf*4)
-        self.conv4 = CNNencoder(nf*4, nf*8)
-        self.conv5 = CNNencoder(nf*8, nf*8)
+        self.conv1_1 = CNNencoder(1, 16)
+        self.conv1_2 = CNNencoder(16, 16)
+        self.conv2_1 = CNNencoder(16, 32)
+        self.conv2_2 = CNNencoder(32, 32)
+        self.conv3_1 = CNNencoder(32, 64)
+        self.conv3_2 = CNNencoder(64, 64)
+        self.conv4_1 = CNNencoder(64, 128)
+        self.conv4_2 = CNNencoder(128, 128)
+        self.conv5_1 = CNNencoder(128, 256)
+        self.conv5_2 = CNNencoder(256, 256)
 
         self.vit = ViT(img_size)
 
-        self.up1 = CNNdecoder(nf*8, nf*8)
-        self.up2 = CNNdecoder(nf*8*2, nf*4)
-        self.up3 = CNNdecoder(nf*4*2, nf*2)
-        self.up4 = CNNdecoder(nf*2*2, nf)
+        self.concat1 = Concat(512, 128)
+        self.convup1 = CNNencoder(128, 128)
+        self.concat2 = Concat(256, 64)
+        self.convup2 = CNNencoder(64, 64)
+        self.concat3 = Concat(128, 32)
+        self.convup3 = CNNencoder(32, 32)
+        self.concat4 = Concat(64, 16)
+        self.convup4 = CNNencoder(16, 16)
+        self.concat5 = Concat(32, 23)
+        self.convup5 = CNNencoder(23, 23)
 
-        self.out = nn.Sequential(
-            nn.Conv2d(nf*2, 1, kernel_size=1, stride=1, bias=False),
+        self.Segmentation_head = nn.Sequential(
+            nn.Conv2d(23, 23, kernel_size=1, stride=1, bias=False),
+            nn.BatchNorm2d(),
             nn.LeakyReLU(inplace=True)
         )
 
 
     def forward(self, x):
-        c1 = self.conv1(x)
-        # (B, 16, 256, 256)
+        # (B, in_channel, 768, 512)
+        c1 = self.conv1_1(x)
+        c1 = self.conv1_2(c1)
+        # (B, 16, 768, 512)
         p1 = self.pooling(c1)
-        # (B, 16, 128, 128)
-        c2 = self.conv2(p1)
-        # (B, 32, 128, 128)
+        # (B, 16, 384, 256)
+        c2 = self.conv2_1(p1)
+        c2 = self.conv2_2(c2)
+        # (B, 32, 384, 256)
         p2 = self.pooling(c2)
-        # (B, 32, 64, 64)
-        c3 = self.conv3(p2)
-        # (B, 64, 64, 64)
+        # (B, 32, 192, 128)
+        c3 = self.conv3_1(p2)
+        c3 = self.conv3_2(c3)
+        # (B, 64, 192, 128)
         p3 = self.pooling(c3)
-        # (B, 64, 32, 32)
-        c4 = self.conv4(p3)
-        # (B, 128, 32, 32)
+        # (B, 64, 96, 64)
+        c4 = self.conv4_1(p3)
+        c4 = self.conv4_2(c4)
+        # (B, 128, 96, 64)
         p4 = self.pooling(c4)
-        # (B, 128, 16, 16)
-        c5 = self.conv5(p4)
-        # (B, 128, 16, 16)
+        # (B, 128, 48, 32)
+        c5 = self.conv5_1(p4)
+        c5 = self.conv5_2(c5)
+        # (B, 256, 48, 32)
         v = self.vit(c5)
-        # (B, 128, 8, 8)
+        # (B, 256, 24, 16)
         v1 = self.upsample(v)
-        # (B, 128, 16, 16)
-        u1 = self.up1(v1, c5)
-        # (B, 128, 16, 16)
+        # (B, 256, 48, 32)
+        u1 = self.concat1(v1, c5)
+        u1 = self.convup1(u1)
+        # (B, 128, 48, 32)
         u1 = self.upsample(u1)
-        # (B, 128, 32, 32)
-        u2 = self.up2(u1, c4)
-        # (B, 64, 32, 32)
+        # (B, 128, 96, 64)
+        u2 = self.concat2(u1, c4)
+        u2 = self.convup2(u2)
+        # (B, 64, 96, 64)
         u2 = self.upsample(u2)
-        # (B, 64, 64, 64)
-        u3 = self.up3(u2, c3)
-        # (B, 32, 64, 64)
+        # (B, 64, 192, 128)
+        u3 = self.concat3(u2, c3)
+        u3 = self.convup3(u3)
+        # (B, 32, 192, 128)
         u3 = self.upsample(u3)
-        # (B, 32, 128, 128)
-        u4 = self.up4(u3, c2)
-        # (B, 16, 128, 128)
+        # (B, 32, 384, 256)
+        u4 = self.concat4(u3, c2)
+        u4 = self.convup4(u4)
+        # (B, 16, 384, 256)
         u4 = self.upsample(u4)
-        # (B, 16, 256, 256)
-        u5 = self.up5(u4, c1)
-        # (B, num_class, 256, 256)
-        out = self.out(u5)
-        # (B, num_class, 256, 256)
+        # (B, 16, 768, 512)
+        u5 = self.concat5(u4, c1)
+        u5 = self.convup5(u5)
+        # (B, 23, 768, 512)
+        out = self.Segmentation_head(u5)
+        # (B, 23, 768, 512)
 
         # if x.size() != out.size():
         #     out = match_size(out, x.shape[2:])
@@ -399,7 +387,7 @@ class Generator(nn.Module):
 
 # model1 = Generator(in_channels=1, out_channels=1, img_size=(160, 192, 224)).cuda()
 
-model1 = Generator(img_size=(256, 256)).cuda()
+model1 = Generator(img_size=(768, 512)).cuda()
 
 # print(list(model1.parameters()))
 
@@ -407,4 +395,4 @@ model1 = Generator(img_size=(256, 256)).cuda()
 
 # summary(model1, (1, 160, 192, 224))
 
-summary(model1, (1, 256, 256))
+summary(model1, (1, 768, 512))
