@@ -23,12 +23,26 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 # CNN Encoder
 
-class CNNencoder(nn.Module):
+class CNNencoder_gn(nn.Module):
     def __init__(self, in_c, out_c):
         super().__init__()
         self.model = nn.Sequential(
             nn.Conv2d(in_c, out_c, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(out_c),
+            nn.GroupNorm(16, out_c, eps=1e-6),
+            nn.LeakyReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        out = self.model(x)
+        return out
+
+
+class CNNencoder_ln(nn.Module):
+    def __init__(self, in_c, out_c):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Conv2d(in_c, out_c, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.GroupNorm(23, out_c, eps=1e-6),
             nn.LeakyReLU(inplace=True)
         )
 
@@ -39,12 +53,28 @@ class CNNencoder(nn.Module):
 
 # CNN Concat
 
-class Concat(nn.Module):
+class Concat_gn(nn.Module):
     def __init__(self, in_c, out_c):
         super().__init__()
         self.model = nn.Sequential(
             nn.Conv2d(in_c, out_c, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(out_c),
+            nn.GroupNorm(16, out_c, eps=1e-6),
+            nn.LeakyReLU(inplace=True)
+        )
+
+    def forward(self, x, skip):
+
+        x = torch.cat((x, skip), 1)
+        out = self.model(x)
+        return out
+
+
+class Concat_ln(nn.Module):
+    def __init__(self, in_c, out_c):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Conv2d(in_c, out_c, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.GroupNorm(23, out_c, eps=1e-6),
             nn.LeakyReLU(inplace=True)
         )
 
@@ -234,7 +264,7 @@ class Conv2dReLU(nn.Sequential):
             kernel_size,
             padding=0,
             stride=1,
-            use_batchnorm=True,
+            use_groupnorm=True,
     ):
         conv = nn.Conv2d(
             in_channels,
@@ -242,13 +272,13 @@ class Conv2dReLU(nn.Sequential):
             kernel_size,
             stride=stride,
             padding=padding,
-            bias=not (use_batchnorm),
+            bias=not (use_groupnorm),
         )
-        relu = nn.ReLU(inplace=True)
+        relu = nn.LeakyReLU(inplace=True)
 
-        bn = nn.BatchNorm2d(out_channels)
+        gn = nn.GroupNorm(16, out_channels, eps=1e-6)
 
-        super(Conv2dReLU, self).__init__(conv, bn, relu)
+        super(Conv2dReLU, self).__init__(conv, gn, relu)
 
 
 #  ViT
@@ -261,7 +291,7 @@ class ViT(nn.Module):
         self.img_size = img_size
         self.patch_size = (2, 2)
         self.down_factor = 4
-        self.conv_more = Conv2dReLU(768, 256, kernel_size=3, padding=1, use_batchnorm=True)
+        self.conv_more = Conv2dReLU(768, 256, kernel_size=3, padding=1, use_groupnorm=True)
 
     def forward(self, x):
         # (B, 256, 32, 48)
@@ -292,29 +322,29 @@ class ViT_UNet(nn.Module):
         self.pooling = nn.MaxPool2d(kernel_size=2)
         self.upsample = nn.Upsample(scale_factor=2)
 
-        self.conv1_1 = CNNencoder(3, 16)
-        self.conv1_2 = CNNencoder(16, 16)
-        self.conv2_1 = CNNencoder(16, 32)
-        self.conv2_2 = CNNencoder(32, 32)
-        self.conv3_1 = CNNencoder(32, 64)
-        self.conv3_2 = CNNencoder(64, 64)
-        self.conv4_1 = CNNencoder(64, 128)
-        self.conv4_2 = CNNencoder(128, 128)
-        self.conv5_1 = CNNencoder(128, 256)
-        self.conv5_2 = CNNencoder(256, 256)
+        self.conv1_1 = CNNencoder_gn(3, 16)
+        self.conv1_2 = CNNencoder_gn(16, 16)
+        self.conv2_1 = CNNencoder_gn(16, 32)
+        self.conv2_2 = CNNencoder_gn(32, 32)
+        self.conv3_1 = CNNencoder_gn(32, 64)
+        self.conv3_2 = CNNencoder_gn(64, 64)
+        self.conv4_1 = CNNencoder_gn(64, 128)
+        self.conv4_2 = CNNencoder_gn(128, 128)
+        self.conv5_1 = CNNencoder_gn(128, 256)
+        self.conv5_2 = CNNencoder_gn(256, 256)
 
         self.vit = ViT(img_size)
 
-        self.concat1 = Concat(512, 128)
-        self.convup1 = CNNencoder(128, 128)
-        self.concat2 = Concat(256, 64)
-        self.convup2 = CNNencoder(64, 64)
-        self.concat3 = Concat(128, 32)
-        self.convup3 = CNNencoder(32, 32)
-        self.concat4 = Concat(64, 16)
-        self.convup4 = CNNencoder(16, 16)
-        self.concat5 = Concat(32, 23)
-        self.convup5 = CNNencoder(23, 23)
+        self.concat1 = Concat_gn(512, 128)
+        self.convup1 = CNNencoder_gn(128, 128)
+        self.concat2 = Concat_gn(256, 64)
+        self.convup2 = CNNencoder_gn(64, 64)
+        self.concat3 = Concat_gn(128, 32)
+        self.convup3 = CNNencoder_gn(32, 32)
+        self.concat4 = Concat_gn(64, 16)
+        self.convup4 = CNNencoder_gn(16, 16)
+        self.concat5 = Concat_ln(32, 23)
+        self.convup5 = CNNencoder_ln(23, 23)
 
         self.Segmentation_head = nn.Conv2d(23, 23, kernel_size=1, stride=1, bias=False)
 

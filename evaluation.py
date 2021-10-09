@@ -131,7 +131,7 @@ ax2.set_title('Ground truth')
 ax2.set_axis_off()
 
 ax3.imshow(pred_mask)
-ax3.set_title('UNet-MobileNet | mIoU {:.3f}'.format(score))
+ax3.set_title('ViT_UNet | mIoU {:.3f}'.format(score))
 ax3.set_axis_off()
 
 
@@ -147,7 +147,7 @@ ax2.set_title('Ground truth')
 ax2.set_axis_off()
 
 ax3.imshow(pred_mask2)
-ax3.set_title('UNet-MobileNet | mIoU {:.3f}'.format(score2))
+ax3.set_title('ViT_UNet | mIoU {:.3f}'.format(score2))
 ax3.set_axis_off()
 
 
