@@ -10,7 +10,7 @@ from model import ViT_UNet
 from dataset import (train_loader, val_loader)
 
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 
 

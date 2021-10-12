@@ -20,7 +20,7 @@ from dataset import (IMAGE_PATH, MASK_PATH, X_test)
 from train import (mIoU, pixel_accuracy)
 
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 
 model = ViT_UNet(img_size=(512, 768))
