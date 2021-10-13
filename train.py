@@ -182,7 +182,7 @@ sched = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr, epochs=epoch,
 history = fit(epoch, model, train_loader, val_loader, criterion, optimizer, sched)
 
 
-torch.save(model, 'ViT_UNet.pt')
+torch.save(model.state_dict(), "/home/mjy/DL_Project/ViT_UNet.pt")
 
 def plot_loss(history):
     plt.plot(history['val_loss'], label='val', marker='o')
