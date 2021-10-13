@@ -100,8 +100,6 @@ class Embeddings(nn.Module):
         # Maxpool2d가 4번 있으니 down_factor = 4
         patch_size = (2, 2)
         # patch_size는 2로 설정
-        # ViT를 거친 후에 1번 upsample을 해서 skip_connection을 해야하는데
-        # patch_size가 2가 아니면(2보다 크면) 1번 upsample로 size 맞춤이 불가능
         n_patches = int((img_size[0]/2**down_factor// patch_size[0]) * (img_size[1]/2**down_factor// patch_size[1]))
         # n_pathces = (512/2**4//8) * (768/2**4//8) = 4
         self.patch_embeddings = Conv2d(in_channels=256,

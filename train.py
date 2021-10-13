@@ -137,7 +137,7 @@ def fit(epochs, model, train_loader, val_loader, criterion, optimizer, scheduler
                 decrease += 1
                 if decrease % 5 == 0:
                     print('saving model...')
-                    torch.save(model, 'ViT_UNet_mIoU-{:.3f}.pt'.format(val_iou_score / len(val_loader)))
+                    torch.save(model.state_dict(), '/home/mjy/DL_Project/ViT_UNet_mIoU-{:.3f}.pt'.format(val_iou_score / len(val_loader)))
 
             if (test_loss / len(val_loader)) > min_loss:
                 not_improve += 1
