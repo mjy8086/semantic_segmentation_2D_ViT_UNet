@@ -17,7 +17,7 @@ import os
 from tqdm import tqdm
 from model import ViT_UNet
 from dataset import (IMAGE_PATH, MASK_PATH, X_test)
-# from train import (mIoU, pixel_accuracy)
+from train import (mIoU, pixel_accuracy)
 
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
@@ -26,7 +26,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 model = ViT_UNet(img_size=(512, 768))
 model.load_state_dict(torch.load("/home/mjy/DL_Project/ViT_UNet.pt"))
 
-print('a')
+
 class DroneTestDataset(Dataset):
 
     def __init__(self, img_path, mask_path, X, transform=None):

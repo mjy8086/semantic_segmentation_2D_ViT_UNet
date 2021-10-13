@@ -26,16 +26,11 @@ def create_df():
 
 
 df = create_df()
-# print('Total Images: ', len(df))
 
 
 #split data
 X_trainval, X_test = train_test_split(df['id'].values, test_size=0.1, random_state=19)
 X_train, X_val = train_test_split(X_trainval, test_size=0.15, random_state=19)
-
-# print('Train Size   : ', len(X_train))
-# print('Val Size     : ', len(X_val))
-# print('Test Size    : ', len(X_test))
 
 
 img = Image.open(IMAGE_PATH + df['id'][100] + '.jpg')
