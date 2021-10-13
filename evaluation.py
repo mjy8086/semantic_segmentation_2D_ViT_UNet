@@ -24,6 +24,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 
 model = ViT_UNet(img_size=(512, 768))
+model.load_state_dict(torch.load("/home/mjy/DL_Project/ViT_UNet.pt"))
 
 class DroneTestDataset(Dataset):
 

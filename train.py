@@ -127,7 +127,7 @@ def fit(epochs, model, train_loader, val_loader, criterion, optimizer, scheduler
                     loss = criterion(output, mask)
                     test_loss += loss.item()
 
-            # calculatio mean for each batch
+            # calculate mean for each batch
             train_losses.append(running_loss / len(train_loader))
             test_losses.append(test_loss / len(val_loader))
 
@@ -137,14 +137,14 @@ def fit(epochs, model, train_loader, val_loader, criterion, optimizer, scheduler
                 decrease += 1
                 if decrease % 5 == 0:
                     print('saving model...')
-                    torch.save(model, 'Unet-Mobilenet_v2_mIoU-{:.3f}.pt'.format(val_iou_score / len(val_loader)))
+                    torch.save(model, 'ViT_UNet_mIoU-{:.3f}.pt'.format(val_iou_score / len(val_loader)))
 
             if (test_loss / len(val_loader)) > min_loss:
                 not_improve += 1
                 min_loss = (test_loss / len(val_loader))
                 print(f'Loss Not Decrease for {not_improve} time')
-                if not_improve == 7:
-                    print('Loss not decrease for 7 times, Stop Training')
+                if not_improve == 20:
+                    print('Loss not decrease for 20 times, Stop Training')
                     break
 
             # iou
@@ -170,7 +170,7 @@ def fit(epochs, model, train_loader, val_loader, criterion, optimizer, scheduler
 
 
 max_lr = 1e-3
-epoch = 70
+epoch = 150
 weight_decay = 1e-4
 
 model = ViT_UNet(img_size=(512, 768))
