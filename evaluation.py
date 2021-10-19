@@ -10,7 +10,7 @@ import os
 from tqdm import tqdm
 from model import ViT_UNet
 from dataset import (IMAGE_PATH, MASK_PATH, X_test)
-from train import (mIoU, pixel_accuracy)
+from utils import *
 
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"

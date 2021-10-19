@@ -8,41 +8,11 @@ import os
 from tqdm import tqdm
 from model import ViT_UNet
 from dataset import (train_loader, val_loader)
+from utils import *
 
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
-
-
-def pixel_accuracy(output, mask):
-    with torch.no_grad():
-        output = torch.argmax(F.softmax(output, dim=1), dim=1)
-        correct = torch.eq(output, mask).int()
-        accuracy = float(correct.sum()) / float(correct.numel())
-    return accuracy
-
-
-def mIoU(pred_mask, mask, smooth=1e-10, n_classes=23):
-    with torch.no_grad():
-        pred_mask = F.softmax(pred_mask, dim=1)
-        pred_mask = torch.argmax(pred_mask, dim=1)
-        pred_mask = pred_mask.contiguous().view(-1)
-        mask = mask.contiguous().view(-1)
-
-        iou_per_class = []
-        for clas in range(0, n_classes): #loop per pixel class
-            true_class = pred_mask == clas
-            true_label = mask == clas
-
-            if true_label.long().sum().item() == 0: #no exist label in this loop
-                iou_per_class.append(np.nan)
-            else:
-                intersect = torch.logical_and(true_class, true_label).sum().float().item()
-                union = torch.logical_or(true_class, true_label).sum().float().item()
-
-                iou = (intersect + smooth) / (union +smooth)
-                iou_per_class.append(iou)
-        return np.nanmean(iou_per_class)
 
 
 def get_lr(optimizer):
@@ -179,7 +149,7 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=max_lr, weight_decay=weight
 sched = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr, epochs=epoch,
                                             steps_per_epoch=len(train_loader))
 
-# history = fit(epoch, model, train_loader, val_loader, criterion, optimizer, sched)
+history = fit(epoch, model, train_loader, val_loader, criterion, optimizer, sched)
 
 
 torch.save(model.state_dict(), "/home/mjy/DL_Project/ViT_UNet.pt")
@@ -213,6 +183,6 @@ def plot_acc(history):
     plt.legend(), plt.grid()
     plt.show()
 
-# plot_loss(history)
-# plot_score(history)
-# plot_acc(history)
+plot_loss(history)
+plot_score(history)
+plot_acc(history)
