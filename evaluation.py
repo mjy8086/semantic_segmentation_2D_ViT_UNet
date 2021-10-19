@@ -17,7 +17,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 
 model = ViT_UNet(img_size=(512, 768))
-saved_path = "/home/mjy/DL_Project/ViT_UNet_mIoU-0.224.pt"
+saved_path = "/home/mjy/DL_Project/ViT_UNet_mIoU-0.297.pt"
 
 
 
