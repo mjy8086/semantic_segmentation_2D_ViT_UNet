@@ -179,7 +179,7 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=max_lr, weight_decay=weight
 sched = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr, epochs=epoch,
                                             steps_per_epoch=len(train_loader))
 
-history = fit(epoch, model, train_loader, val_loader, criterion, optimizer, sched)
+# history = fit(epoch, model, train_loader, val_loader, criterion, optimizer, sched)
 
 
 torch.save(model.state_dict(), "/home/mjy/DL_Project/ViT_UNet.pt")
@@ -213,6 +213,6 @@ def plot_acc(history):
     plt.legend(), plt.grid()
     plt.show()
 
-plot_loss(history)
-plot_score(history)
-plot_acc(history)
+# plot_loss(history)
+# plot_score(history)
+# plot_acc(history)

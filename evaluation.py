@@ -17,7 +17,8 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 
 model = ViT_UNet(img_size=(512, 768))
-model.load_state_dict(torch.load("/home/mjy/DL_Project/ViT_UNet.pt"))
+saved_path = "/home/mjy/DL_Project/ViT_UNet_mIoU-0.224.pt"
+
 
 
 class DroneTestDataset(Dataset):
@@ -54,6 +55,7 @@ test_set = DroneTestDataset(IMAGE_PATH, MASK_PATH, X_test, transform=t_test)
 
 
 def predict_image_mask_miou(model, image, mask, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], device="cuda"):
+    model.load_state_dict(torch.load(saved_path))
     model.eval()
     t = T.Compose([T.ToTensor(), T.Normalize(mean, std)])
     image = t(image)
@@ -72,6 +74,7 @@ def predict_image_mask_miou(model, image, mask, mean=[0.485, 0.456, 0.406], std=
 
 
 def predict_image_mask_pixel(model, image, mask, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], device="cuda"):
+    model.load_state_dict(torch.load(saved_path))
     model.eval()
     t = T.Compose([T.ToTensor(), T.Normalize(mean, std)])
     image = t(image)
@@ -94,6 +97,8 @@ pred_mask, score = predict_image_mask_miou(model, image, mask)
 
 
 def miou_score(model, test_set):
+    model.load_state_dict(torch.load(saved_path))
+    model.eval()
     score_iou = []
     for i in tqdm(range(len(test_set))):
         img, mask = test_set[i]
@@ -106,6 +111,8 @@ mob_miou = miou_score(model, test_set)
 
 
 def pixel_acc(model, test_set):
+    model.load_state_dict(torch.load(saved_path))
+    model.eval()
     accuracy = []
     for i in tqdm(range(len(test_set))):
         img, mask = test_set[i]
@@ -129,21 +136,8 @@ ax3.imshow(pred_mask)
 ax3.set_title('ViT_UNet | mIoU {:.3f}'.format(score))
 ax3.set_axis_off()
 
+plt.show()
 
-image2, mask2 = test_set[4]
-pred_mask2, score2 = predict_image_mask_miou(model, image2, mask2)
-
-fig, (ax1, ax2, ax3) = plt.subplots(1,3, figsize=(20,10))
-ax1.imshow(image2)
-ax1.set_title('Picture');
-
-ax2.imshow(mask2)
-ax2.set_title('Ground truth')
-ax2.set_axis_off()
-
-ax3.imshow(pred_mask2)
-ax3.set_title('ViT_UNet | mIoU {:.3f}'.format(score2))
-ax3.set_axis_off()
 
 
 print('Test Set mIoU', np.mean(mob_miou))
