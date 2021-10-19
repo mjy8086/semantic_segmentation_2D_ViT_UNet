@@ -113,8 +113,8 @@ def fit(epochs, model, train_loader, val_loader, criterion, optimizer, scheduler
                 not_improve += 1
                 min_loss = (test_loss / len(val_loader))
                 print(f'Loss Not Decrease for {not_improve} time')
-                if not_improve == 40:
-                    print('Loss not decrease for 40 times, Stop Training')
+                if not_improve == 70:
+                    print('Loss not decrease for 70 times, Stop Training')
                     break
 
             # iou
