@@ -113,8 +113,8 @@ def fit(epochs, model, train_loader, val_loader, criterion, optimizer, scheduler
                 not_improve += 1
                 min_loss = (test_loss / len(val_loader))
                 print(f'Loss Not Decrease for {not_improve} time')
-                if not_improve == 20:
-                    print('Loss not decrease for 20 times, Stop Training')
+                if not_improve == 40:
+                    print('Loss not decrease for 40 times, Stop Training')
                     break
 
             # iou
@@ -140,7 +140,7 @@ def fit(epochs, model, train_loader, val_loader, criterion, optimizer, scheduler
 
 
 max_lr = 1e-3
-epoch = 150
+epoch = 300
 weight_decay = 1e-4
 
 model = ViT_UNet(img_size=(512, 768))
