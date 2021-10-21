@@ -1,15 +1,9 @@
 import torch
 from torch import nn
-from torch.nn.modules.module import Module
-from torch.nn.modules.utils import _triple
 import torch.nn.functional
 from torch.nn import Dropout, Softmax, Linear, LayerNorm, Conv2d
-import torchvision
 import math
 import copy
-import torchsummary
-from torchsummary import summary
-import GPUtil
 import os
 
 
@@ -403,10 +397,3 @@ class ViT_UNet(nn.Module):
         # (B, 23, 512, 768)
 
         return out
-
-
-
-# model1 = ViT_UNet(img_size=(512, 768)).cuda()
-#
-#
-# summary(model1, (1, 512, 768))
