@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 
 
+# Pixel Accuracy
 
 def pixel_accuracy(output, mask):
     with torch.no_grad():
@@ -12,6 +13,8 @@ def pixel_accuracy(output, mask):
         accuracy = float(correct.sum()) / float(correct.numel())
     return accuracy
 
+
+# mIoU
 
 def mIoU(pred_mask, mask, smooth=1e-10, n_classes=23):
     with torch.no_grad():

@@ -9,10 +9,11 @@ import cv2
 import albumentations as A
 import os
 
-
+# set image path
 IMAGE_PATH = '/DataCommon2/mjy/data/Deeplearning_Project/Drone_dataset/dataset/semantic_drone_dataset/original_images/'
 MASK_PATH = '/DataCommon2/mjy/data/Deeplearning_Project/Drone_dataset/dataset/semantic_drone_dataset/label_images_semantic/'
 
+# the number of classes of this datase is 23
 n_classes = 23
 
 
@@ -28,23 +29,16 @@ def create_df():
 df = create_df()
 
 
-#split data
+# split data
 X_trainval, X_test = train_test_split(df['id'].values, test_size=0.1, random_state=19)
 X_train, X_val = train_test_split(X_trainval, test_size=0.15, random_state=19)
 
 
 img = Image.open(IMAGE_PATH + df['id'][100] + '.jpg')
 mask = Image.open(MASK_PATH + df['id'][100] + '.png')
-# print('Image Size', np.asarray(img).shape)
-# print('Mask Size', np.asarray(mask).shape)
 
 
-# plt.imshow(img)
-# plt.imshow(mask, alpha=0.6)
-# plt.title('Picture with Mask Appplied')
-# plt.show()
-
-
+# Dataset class
 class DroneDataset(Dataset):
 
     def __init__(self, img_path, mask_path, X, mean, std, transform=None, patch=False):
@@ -102,11 +96,11 @@ t_train = A.Compose([A.Resize(512, 768, interpolation=cv2.INTER_NEAREST), A.Hori
 t_val = A.Compose([A.Resize(512, 768, interpolation=cv2.INTER_NEAREST), A.HorizontalFlip(),
                    A.GridDistortion(p=0.2)])
 
-#datasets
+# datasets
 train_set = DroneDataset(IMAGE_PATH, MASK_PATH, X_train, mean, std, t_train, patch=False)
 val_set = DroneDataset(IMAGE_PATH, MASK_PATH, X_val, mean, std, t_val, patch=False)
 
-#dataloader
+# dataloader
 batch_size= 10
 
 train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, drop_last=True)

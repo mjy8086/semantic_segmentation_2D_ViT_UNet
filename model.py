@@ -10,13 +10,21 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 
-# 1) CNN Encoder
-# 2) CNN Decoder
-# 3) ViT
+"""
+ViT_UNet is consists of 3 parts
+1) CNN Encoder
+2) bottle neck Vision Trnasformer(ViT)
+3) CNN Decoder
+"""
+
 
 
 # CNN Encoder
 
+# BatchNorm is not used because it's not good for ViT
+# GroupNorm and LayerNorm is used instead
+
+# Conv with GroupNorm
 class CNNencoder_gn(nn.Module):
     def __init__(self, in_c, out_c):
         super().__init__()
@@ -30,7 +38,7 @@ class CNNencoder_gn(nn.Module):
         out = self.model(x)
         return out
 
-
+# Conv with LayerNorm
 class CNNencoder_ln(nn.Module):
     def __init__(self, in_c, out_c):
         super().__init__()
@@ -45,8 +53,7 @@ class CNNencoder_ln(nn.Module):
         return out
 
 
-# CNN Concat
-
+# CNN Concat with GroupNorm
 class Concat_gn(nn.Module):
     def __init__(self, in_c, out_c):
         super().__init__()
@@ -62,7 +69,7 @@ class Concat_gn(nn.Module):
         out = self.model(x)
         return out
 
-
+# CNN concat with LayerNorm
 class Concat_ln(nn.Module):
     def __init__(self, in_c, out_c):
         super().__init__()
@@ -140,11 +147,6 @@ class MSA(nn.Module):
         self.attn_dropout = Dropout(0.1)
         self.proj_dropout = Dropout(0.1)
         self.softmax = Softmax(dim=-1)
-
-    # def transpose_for_scores(self, x):
-    #     new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
-    #     x = x.view(*new_x_shape)
-    #     return x.permute(0, 2, 1, 3)
 
     def transpose_for_scores(self, x):
         x = x.view([x.size()[0], -1, self.num_attention_heads, self.attention_head_size])
@@ -307,6 +309,7 @@ class ViT(nn.Module):
 
 # Generator
 
+# CNN Encoder - ViT bottle neck - CNN Decoder
 class ViT_UNet(nn.Module):
     def __init__(self, img_size=(512, 768)):
         super().__init__()

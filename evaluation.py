@@ -12,15 +12,15 @@ from model import ViT_UNet
 from dataset import (IMAGE_PATH, MASK_PATH, X_test)
 from utils import *
 
-
+# Set GPU number
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
-
+# import pretrained model
 model = ViT_UNet(img_size=(512, 768))
 saved_path = "/home/mjy/DL_Project/ViT_UNet_mIoU-0.359.pt"
 
 
-
+# test dataset
 class DroneTestDataset(Dataset):
 
     def __init__(self, img_path, mask_path, X, transform=None):

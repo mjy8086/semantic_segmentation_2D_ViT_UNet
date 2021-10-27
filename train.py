@@ -11,6 +11,7 @@ from dataset import (train_loader, val_loader)
 from utils import *
 
 
+# Set GPU number
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 
